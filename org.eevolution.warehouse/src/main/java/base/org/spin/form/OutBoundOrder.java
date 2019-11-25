@@ -22,8 +22,6 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.text.DecimalFormat;
-import java.util.Arrays;
-import java.util.Optional;
 import java.util.Vector;
 import java.util.logging.Level;
 
@@ -446,7 +444,8 @@ public class OutBoundOrder {
 			//	Order By
 				sql.append("ORDER BY lord.DD_Order_ID ASC");
 			
-		} else {
+		}
+		else{
 
 			int rows = orderTable.getRowCount();
 			rowsSelected = 0;
@@ -468,7 +467,7 @@ public class OutBoundOrder {
 					"SUM(" +
 					"		COALESCE(CASE " +
 					"			WHEN (c.IsDelivered = 'N' AND lc.C_OrderLine_ID IS NOT NULL AND c.DocStatus = 'CO') " +
-					"			THEN lc.MovementQty - COALESCE(iol.MovementQty, 0) " +
+					"			THEN lc.MovementQty " +
 					"			ELSE 0 " +
 					"		END, 0)" +
 					") QtyLoc, " +
@@ -476,7 +475,7 @@ public class OutBoundOrder {
 					"	SUM(" +
 					"		COALESCE(CASE " +
 					"			WHEN (c.IsDelivered = 'N' AND lc.C_OrderLine_ID IS NOT NULL AND c.DocStatus = 'CO') " +
-					"			THEN lc.MovementQty - COALESCE(iol.MovementQty, 0) " +
+					"			THEN lc.MovementQty " +
 					"			ELSE 0 " +
 					"		END, 0)" +
 					"		)" +
@@ -490,12 +489,6 @@ public class OutBoundOrder {
 					"INNER JOIN C_UOM uomp ON(uomp.C_UOM_ID = pro.C_UOM_ID) " +
 					"LEFT JOIN WM_InOutBoundLine lc ON(lc.C_OrderLine_ID = lord.C_OrderLine_ID) " +
 					"LEFT JOIN WM_InOutBound c ON(c.WM_InOutBound_ID = lc.WM_InOutBound_ID) " +
-					"LEFT JOIN (SELECT iol.WM_InOutBoundLine_ID, SUM(iol.MovementQty) MovementQty "
-					+ "						FROM M_InOut io "
-					+ "						INNER JOIN M_InOutLine iol ON(iol.M_InOut_ID = io.M_InOut_ID) "
-					+ "						WHERE io.DocStatus IN('CO', 'CL') "
-					+ "						AND iol.WM_InOutBoundLine_ID IS NOT NULL"
-					+ "				GROUP BY iol.WM_InOutBoundLine_ID) iol ON(iol.WM_InOutBoundLine_ID = lc.WM_InOutBoundLine_ID) " +
 					"LEFT JOIN (" +
 					"				SELECT l.M_Warehouse_ID, st.M_Product_ID, " +
 					"					COALESCE(SUM(st.QtyOnHand), 0) QtyOnHand, " +
@@ -520,7 +513,7 @@ public class OutBoundOrder {
 					"									SUM(" +
 					"										COALESCE(CASE " +
 					"											WHEN (c.IsDelivered = 'N' AND lc.C_OrderLine_ID IS NOT NULL AND c.DocStatus = 'CO') " +
-					"											THEN lc.MovementQty - COALESCE(iol.MovementQty, 0) " +
+					"											THEN lc.MovementQty " +
 					"											ELSE 0 " +
 					"										END, 0)" +
 					"									)" +
@@ -752,7 +745,7 @@ public class OutBoundOrder {
 		columnNames.add(Msg.translate(Env.getCtx(), "QtyOnHand"));
 		columnNames.add(Msg.translate(Env.getCtx(), "QtyInTransit"));
 		columnNames.add(Msg.translate(Env.getCtx(), "Qty"));
-		columnNames.add(Msg.translate(Env.getCtx(), "PickedQty"));
+		columnNames.add(Msg.translate(Env.getCtx(), "QtyAvailableForLoad"));
 		return columnNames;
 	}
 
@@ -884,15 +877,11 @@ public class OutBoundOrder {
         if (docTypeTargetId > 0) {
         	outBoundOrder.setC_DocType_ID(docTypeTargetId);
         } else {
-        	Optional<MDocType> defaultDocumentType = Arrays.asList(MDocType.getOfDocBaseType(Env.getCtx(), MDocType.DOCBASETYPE_WarehouseManagementOrder))
-        		.stream()
-        		.filter(documentType -> documentType.isSOTrx())
-        		.findFirst();
-        	
-            if (!defaultDocumentType.isPresent()) {
+            int docTypeId = MDocType.getDocType(MDocType.DOCBASETYPE_WarehouseManagementOrder);
+            if (docTypeId <= 0) {
             	throw new DocTypeNotFoundException(MDocType.DOCBASETYPE_WarehouseManagementOrder, "");
             } else {
-            	outBoundOrder.setC_DocType_ID(defaultDocumentType.get().getC_DocType_ID());
+            	outBoundOrder.setC_DocType_ID(docTypeId);
             }
         }
 		//	Set Warehouse
@@ -932,13 +921,11 @@ public class OutBoundOrder {
 					MDDOrderLine line = new MDDOrderLine(Env.getCtx(), orderLineId, trxName);
 					outBoundOrderLine.setDD_Order_ID(line.getDD_Order_ID());
 					outBoundOrderLine.setDD_Order_ID(line.getDD_Order_ID());
-					outBoundOrderLine.setC_UOM_ID(line.getC_UOM_ID());
 				} else {
 					outBoundOrderLine.setC_OrderLine_ID(orderLineId);
 					MOrderLine line = new MOrderLine(Env.getCtx(), orderLineId, trxName);
 					outBoundOrderLine.setC_Order_ID(line.getC_Order_ID());
 					outBoundOrderLine.setC_Order_ID(line.getC_Order_ID());
-					outBoundOrderLine.setC_UOM_ID(line.getC_UOM_ID());
 				}
 				outBoundOrderLine.setM_Product_ID(productId);
 				outBoundOrderLine.setMovementQty(qty);
@@ -1133,7 +1120,7 @@ public class OutBoundOrder {
 				.append("@M_Warehouse_ID@=").append(warehouse)
 				.append(" @QtyAvailable@=").append(m_QtyOnHand.subtract(m_QtyInTransit).doubleValue())
 				.append(" @QtyToDeliver@=").append(m_QtySet.doubleValue())
-				.append(" @PickedQty@=").append(m_QtyAvailable.doubleValue())
+				.append(" @QtyAvailableForLoad@=").append(m_QtyAvailable.doubleValue())
 				.append("]");
 		}
 		//	

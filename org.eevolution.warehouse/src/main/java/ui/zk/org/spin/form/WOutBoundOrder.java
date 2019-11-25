@@ -516,7 +516,7 @@ public class WOutBoundOrder extends OutBoundOrder
 				false, "AD_Ref_List.Value IN ('CO','PR')");
 		//	Document Action
 		docActionPick = new WTableDirEditor("DocAction", true, false, true,docActionL);
-		docActionPick.setValue(DocAction.ACTION_Complete);
+		docActionPick.setValue(DocAction.ACTION_Prepare);
 		//	
 		documentDateField.setValue(Env.getContextAsDate(Env.getCtx(), "#Date"));
 		//	Set Date
@@ -564,7 +564,7 @@ public class WOutBoundOrder extends OutBoundOrder
 		documentDateField.setValue(Env.getContextAsDate(Env.getCtx(), "#Date"));
 		shipmentDateField.setValue(Env.getContextAsDate(Env.getCtx(), "#Date"));
 		shipperPick.setValue(null);
-		docActionPick.setValue(DocAction.ACTION_Complete);
+		docActionPick.setValue(DocAction.ACTION_Prepare);
 	}
 
 	/**
@@ -945,19 +945,20 @@ public class WOutBoundOrder extends OutBoundOrder
 		boolean isOrderLine = (event.getModel().equals(orderLineTable.getModel()));
 		if(isOrder) {
 			//	Load Lines
-			StringBuffer sql = getQueryLine(w_orderTable);
-			Vector<Vector<Object>> data = getOrderLineData(w_orderTable, sql);
-			Vector<String> columnNames = getOrderLineColumnNames();
+//			if(m_C_UOM_Weight_ID != 0) {
+				StringBuffer sql = getQueryLine(w_orderTable);
+				Vector<Vector<Object>> data = getOrderLineData(w_orderTable, sql);
+				Vector<String> columnNames = getOrderLineColumnNames();
 				
-			loadBuffer(orderLineTable);
-			//  Remove previous listeners
-			orderLineTable.getModel().removeTableModelListener(this);
-			//  Set Model
-			ListModelTable modelP = new ListModelTable(data);
-			modelP.addTableModelListener(this);
-			orderLineTable.setData(modelP, columnNames);
-			setOrderLineColumnClass(orderLineTable);
-			setValueFromBuffer(orderLineTable);	
+				loadBuffer(orderLineTable);
+				//  Remove previous listeners
+				orderLineTable.getModel().removeTableModelListener(this);
+				//  Set Model
+				ListModelTable modelP = new ListModelTable(data);
+				modelP.addTableModelListener(this);
+				orderLineTable.setData(modelP, columnNames);
+				setOrderLineColumnClass(orderLineTable);
+				setValueFromBuffer(orderLineTable);	
 		} else if(isOrderLine) {
 			if(col == OL_QTY) {	//	Quantity
 				BigDecimal qty = (BigDecimal) orderLineTable.getValueAt(row, OL_QTY);
@@ -1105,29 +1106,29 @@ public class WOutBoundOrder extends OutBoundOrder
 	 */
 	private void printDocument() {
 		//	Get Document Type
-		MDocType documentType = MDocType.get(Env.getCtx(), 
+		MDocType m_DocType = MDocType.get(Env.getCtx(), 
 				outBoundOrder.getC_DocType_ID());
-		if(documentType == null)
+		if(m_DocType == null)
 			return;
 		//	
-		if(documentType.getAD_PrintFormat_ID() == 0) {
+		if(m_DocType.getAD_PrintFormat_ID() == 0) {
 			String msg = Msg.parseTranslation(Env.getCtx(), 
 					"@NoDocPrintFormat@ @AD_Table_ID@ = @WM_InOutBound_ID@");
 			log.warning(msg);
 			//	
-			return;
+			FDialog.warn(m_WindowNo, parameterPanel, "Error", msg);
 		}
 		//	Get Print Format
-		MPrintFormat format = MPrintFormat.get(Env.getCtx(), 
-				documentType.getAD_PrintFormat_ID(), false);
+		MPrintFormat f = MPrintFormat.get(Env.getCtx(), 
+				m_DocType.getAD_PrintFormat_ID(), false);
 		//	
-		if(format != null) {
+		if(f != null) {
 			MQuery q = new MQuery(MWMInOutBound.Table_Name);
 			q.addRestriction(MWMInOutBound.Table_Name + "_ID", "=", outBoundOrder.getWM_InOutBound_ID());
 			PrintInfo i = new PrintInfo(Msg.translate(Env.getCtx(), 
 					MWMInOutBound.Table_Name + "_ID"), MWMInOutBound.Table_ID, outBoundOrder.getWM_InOutBound_ID());
 			//	
-			ReportEngine re = new ReportEngine(Env.getCtx(), format, q, i, null);
+			ReportEngine re = new ReportEngine(Env.getCtx(), f, q, i, null);
 			//	Print
 			//	Direct Print
 			//re.print();
